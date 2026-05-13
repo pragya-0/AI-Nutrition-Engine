@@ -1,168 +1,105 @@
 import streamlit as st
-import requests
-
-BASE_URL = "http://127.0.0.1:8000"
+import pandas as pd
+import random
 
 st.set_page_config(page_title="AI Nutrition Engine", layout="wide")
 
-st.title("🥗 AI Nutrition Engine")
-st.caption("Personalized Indian Diet Planner + Smart AI Food System")
+st.title("🥗 AI Nutrition Engine (Streamlit Only Demo)")
+st.caption("No backend needed — fully working prototype")
 
 # =========================
-# SIDEBAR - USER PROFILE
+# LOAD DATASET
+# =========================
+df = pd.read_csv("clean_food_dataset.csv")
+
+# =========================
+# SIDEBAR USER INPUT
 # =========================
 st.sidebar.header("👤 User Profile")
 
-body_type = st.sidebar.selectbox(
-    "Body Type",
-    ["Ectomorph", "Mesomorph", "Endomorph"]
-)
+body_type = st.sidebar.selectbox("Body Type", ["Ectomorph", "Mesomorph", "Endomorph"])
+activity_level = st.sidebar.selectbox("Activity Level", ["Low", "Medium", "High"])
+diet_type = st.sidebar.selectbox("Diet Preference", ["Vegetarian", "Vegan", "Non-Vegetarian", "Bengali Diet"])
 
-activity_level = st.sidebar.selectbox(
-    "Activity Level",
-    ["Low", "Medium", "High"]
-)
-
-diet_type = st.sidebar.selectbox(
-    "Diet Preference",
-    ["Vegetarian", "Vegan", "Non-Vegetarian", "Bengali Diet"]
-)
-
-goal = st.sidebar.selectbox(
-    "Fitness Goal",
-    ["Fat Loss", "Muscle Gain", "Maintenance"]
-)
-
-calories = st.sidebar.number_input(
-    "Daily Calorie Target",
-    min_value=1200,
-    max_value=4000,
-    value=2000
-)
+calories_target = st.sidebar.number_input("Daily Calories", 1200, 4000, 2000)
 
 st.sidebar.markdown("---")
-st.sidebar.info("AI adapts meal plans based on your profile ⚡")
+st.sidebar.info("AI adapts nutrition plan based on dataset")
 
+# =========================
+# FILTER FUNCTION
+# =========================
+def get_foods(max_cal):
+    return df[df["calories"] <= max_cal].sample(min(10, len(df)))
 
 # =========================
 # MEAL PLAN GENERATOR
 # =========================
-st.markdown("## 🍱 AI Meal Planner")
+st.subheader("🍱 AI Meal Plan Generator (Demo)")
 
 if st.button("Generate Meal Plan"):
 
-    res = requests.get(
-        f"{BASE_URL}/meal-plan",
-        params={
-            "goal": goal,
-            "diet": diet_type,
-            "calories": calories
-        }
-    )
-
-    data = res.json()
-
-    st.success("Your Personalized Meal Plan is Ready 🎯")
+    breakfast = get_foods(calories_target * 0.3)
+    lunch = get_foods(calories_target * 0.4)
+    dinner = get_foods(calories_target * 0.3)
 
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        st.subheader("🌅 Breakfast")
-        for item in data["meal_plan"]["breakfast"]:
-            st.write(f"🍽 {item['food_name']} ({item['calories']} kcal)")
+        st.markdown("### 🌅 Breakfast")
+        st.dataframe(breakfast[["food_name", "calories", "protein", "carbs", "fat"]])
 
     with col2:
-        st.subheader("🍛 Lunch")
-        for item in data["meal_plan"]["lunch"]:
-            st.write(f"🍽 {item['food_name']} ({item['calories']} kcal)")
+        st.markdown("### 🍛 Lunch")
+        st.dataframe(lunch[["food_name", "calories", "protein", "carbs", "fat"]])
 
     with col3:
-        st.subheader("🌙 Dinner")
-        for item in data["meal_plan"]["dinner"]:
-            st.write(f"🍽 {item['food_name']} ({item['calories']} kcal)")
+        st.markdown("### 🌙 Dinner")
+        st.dataframe(dinner[["food_name", "calories", "protein", "carbs", "fat"]])
 
 
 # =========================
-# MACRO BREAKDOWN
+# MACRO CALCULATOR
 # =========================
-st.markdown("---")
-st.markdown("## 📊 Macro Breakdown")
+st.subheader("📊 Macro Breakdown")
 
 if st.button("Calculate Macros"):
 
-    res = requests.get(f"{BASE_URL}/macros", params={"calories": calories})
-    data = res.json()
+    protein = calories_target * 0.3 / 4
+    carbs = calories_target * 0.4 / 4
+    fat = calories_target * 0.3 / 9
 
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric("Protein (g)", data["protein_g"])
-    col2.metric("Carbs (g)", data["carbs_g"])
-    col3.metric("Fat (g)", data["fat_g"])
+    st.metric("Protein (g)", round(protein, 2))
+    st.metric("Carbs (g)", round(carbs, 2))
+    st.metric("Fat (g)", round(fat, 2))
 
 
 # =========================
-# SMART FOOD SEARCH (FIXED UI)
+# SMART FOOD SEARCH
 # =========================
-st.markdown("---")
-st.markdown("## 🔍 Smart Food Search")
+st.subheader("🔍 Smart Food Search")
 
-query = st.text_input("Search food (e.g. tea, rice, curry)")
+query = st.text_input("Search food")
 
-if st.button("Search Food"):
+if st.button("Search"):
 
-    res = requests.get(f"{BASE_URL}/search", params={"query": query})
-    data = res.json()
+    result = df[df["food_name"].str.contains(query, case=False, na=False)]
 
-    if not data:
-        st.warning("No food found 😔 Try another keyword")
+    if len(result) == 0:
+        st.warning("No food found")
     else:
-        for food in data:
-            with st.container():
-                st.markdown(f"### 🍽 {food['food_name']}")
-                st.write(f"🔥 Calories: {food['calories']} kcal")
-                st.write(f"💪 Protein: {food['protein']} g")
-                st.write(f"🍞 Carbs: {food['carbs']} g")
-                st.write(f"🧈 Fat: {food['fat']} g")
-                st.divider()
+        st.dataframe(result[["food_name", "calories", "protein", "carbs", "fat"]])
 
 
 # =========================
 # FOOD SCANNER (SIMULATED)
 # =========================
-st.markdown("---")
-st.markdown("## 📷 Smart Food Scanner (Demo)")
+st.subheader("📷 Smart Food Scanner (Demo)")
 
-food_item = st.text_input("Enter food item (simulate image scan)")
+food_input = st.text_input("Enter food name (simulate image scan)")
 
 if st.button("Scan Food"):
 
-    res = requests.get(f"{BASE_URL}/scan-food", params={"item": food_item})
-    data = res.json()
+    match = df[df["food_name"].str.contains(food_input, case=False, na=False)]
 
-    if "message" in data:
-        st.error(data["message"])
-    else:
-        st.success("Food Detected!")
-
-        st.markdown(f"### 🍽 {data['detected_food']}")
-        st.write(f"🔥 Calories: {data['calories']}")
-        st.write(f"💪 Protein: {data['protein']}")
-        st.write(f"🍞 Carbs: {data['carbs']}")
-        st.write(f"🧈 Fat: {data['fat']}")
-
-
-# =========================
-# ADAPTIVE ENGINE
-# =========================
-st.markdown("---")
-st.markdown("## 🧠 Adaptive AI Engine")
-
-if st.button("Run Adaptive Engine"):
-
-    res = requests.get(f"{BASE_URL}/adaptive-plan")
-    data = res.json()
-
-    st.success("AI Adjusted Your Plan")
-
-    st.metric("Adjusted Calories", data["adjusted_calories"])
-    st.info(data["reasoning"])
+   
